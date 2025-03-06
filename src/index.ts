@@ -14,9 +14,9 @@ function sanitizeTextForHtml(text: string) {
 function emailHtml(email: { from: string; subject: string; text: string; at: number }) {
 	return `<hr />
 <article>
-	<h2>${email.subject}</h2>
+	<h2>${sanitizeTextForHtml(email.subject)}</h2>
 	<p><span style="font-weight: bold;">Date:</span> ${new Date(email.at).toLocaleString()}</p>
-	<p><span style="font-weight: bold;">From:</span> ${email.from}</p>
+	<p><span style="font-weight: bold;">From:</span> ${sanitizeTextForHtml(email.from)}</p>
 	<p><pre>${sanitizeTextForHtml(email.text)}</pre></p>
 </article>`;
 }
