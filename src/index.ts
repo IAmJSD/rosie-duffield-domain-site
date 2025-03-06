@@ -1,6 +1,6 @@
 import PostalMime from 'postal-mime';
 import { parse } from 'node-html-parser';
-import html from './base.html';
+import baseHtml from './base.html.ts';
 
 function sanitizeTextForHtml(text: string) {
 	return text
@@ -24,7 +24,7 @@ function emailHtml(email: { from: string; subject: string; text: string; at: num
 export default {
 	async fetch(request, env): Promise<Response> {
 		// Make sure it is a GET request to /.
-		if (request.method !== 'GET' || request.url !== '/') {
+		if (request.method !== 'GET' || new URL(request.url).pathname !== '/') {
 			return new Response('Not found', { status: 404 });
 		}
 
@@ -45,7 +45,7 @@ export default {
 		// Compile the HTML.
 		const emailsHtml = emails.map((email) => emailHtml(email)).join('');
 
-		return new Response(html(emailsHtml), {
+		return new Response(baseHtml(emailsHtml), {
 			headers: {
 				'Content-Type': 'text/html',
 				'Cache-Control': 'public, max-age=300',
@@ -53,7 +53,7 @@ export default {
 		});
 	},
 	async email(message, env) {
-		const parsed = await PostalMime.parse(message);
+		const parsed = await PostalMime.parse(message.raw);
 		const text = parsed.text || parse(parsed.html || '').text;
 		if (!text) return;
 

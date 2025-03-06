@@ -24,6 +24,8 @@
 		"allowJs": true,
 		/* Enable error reporting in type-checked JavaScript files. */
 		"checkJs": false,
+		/* Allow imports from TS extensions. */
+		"allowImportingTsExtensions": true,
 
 		/* Disable emitting files from a compilation. */
 		"noEmit": true,
