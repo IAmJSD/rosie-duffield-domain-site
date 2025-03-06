@@ -1,18 +1,73 @@
-/**
- * Welcome to Cloudflare Workers! This is your first worker.
- *
- * - Run `npm run dev` in your terminal to start a development server
- * - Open a browser tab at http://localhost:8787/ to see your worker in action
- * - Run `npm run deploy` to publish your worker
- *
- * Bind resources to your worker in `wrangler.jsonc`. After adding bindings, a type definition for the
- * `Env` object can be regenerated with `npm run cf-typegen`.
- *
- * Learn more at https://developers.cloudflare.com/workers/
- */
+import PostalMime from 'postal-mime';
+import { parse } from 'node-html-parser';
+import html from './base.html';
+
+function sanitizeTextForHtml(text: string) {
+	return text
+		.replace(/</g, '&lt;')
+		.replace(/>/g, '&gt;')
+		.replace(/&/g, '&amp;')
+		.replace(/"/g, '&quot;')
+		.replace(/'/g, '&#039;');
+}
+
+function emailHtml(email: { from: string; subject: string; text: string; at: number }) {
+	return `<hr />
+<article>
+	<h2>${email.subject}</h2>
+	<p><span style="font-weight: bold;">Date:</span> ${new Date(email.at).toLocaleString()}</p>
+	<p><span style="font-weight: bold;">From:</span> ${email.from}</p>
+	<p><pre>${sanitizeTextForHtml(email.text)}</pre></p>
+</article>`;
+}
 
 export default {
-	async fetch(request, env, ctx): Promise<Response> {
-		return new Response('Hello World!');
+	async fetch(request, env): Promise<Response> {
+		// Make sure it is a GET request to /.
+		if (request.method !== 'GET' || request.url !== '/') {
+			return new Response('Not found', { status: 404 });
+		}
+
+		// Get the emails.
+		const allEmails = await env.EMAILS.list({ prefix: 'email:' });
+		const emails = await Promise.all(
+			allEmails.keys.map(async (email) => {
+				return JSON.parse(await env.EMAILS.get(email.name) || '{}') as {
+					from: string;
+					subject: string;
+					text: string;
+					at: number;
+				};
+			}),
+		);
+		emails.sort((a, b) => b.at - a.at);
+
+		// Compile the HTML.
+		const emailsHtml = emails.map((email) => emailHtml(email)).join('');
+
+		return new Response(html(emailsHtml), {
+			headers: {
+				'Content-Type': 'text/html',
+				'Cache-Control': 'public, max-age=300',
+			},
+		});
+	},
+	async email(message, env) {
+		const parsed = await PostalMime.parse(message);
+		const text = parsed.text || parse(parsed.html || '').text;
+		if (!text) return;
+
+		const { from } = message;
+		const subject = parsed.subject || 'No subject';
+
+		await env.EMAILS.put(
+			`email:${crypto.randomUUID()}`,
+			JSON.stringify({
+				from,
+				subject,
+				text,
+				at: Date.now(),
+			}),
+		);
 	},
 } satisfies ExportedHandler<Env>;
