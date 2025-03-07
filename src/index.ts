@@ -30,16 +30,17 @@ export default {
 
 		// Get the emails.
 		const allEmails = await env.EMAILS.list({ prefix: 'email:' });
-		const emails = await Promise.all(
+		const emails = (await Promise.all(
 			allEmails.keys.map(async (email) => {
 				return JSON.parse(await env.EMAILS.get(email.name) || '{}') as {
 					from: string;
 					subject: string;
 					text: string;
 					at: number;
+					public: boolean;
 				};
 			}),
-		);
+		)).filter((email) => email.public);
 		emails.sort((a, b) => b.at - a.at);
 
 		// Compile the HTML.
@@ -67,6 +68,7 @@ export default {
 				subject,
 				text,
 				at: Date.now(),
+				public: false,
 			}),
 		);
 	},
